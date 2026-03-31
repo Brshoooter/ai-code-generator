@@ -1,2 +1,5 @@
 # ai-code-generator
 Microservices-Based Web Application for Automated Source Code Generation Using Artificial Intelligence
+
+
+Aici vreau sa lucrez la proiectul meu de licenta. Proiectul se bazeaza pe o structura de microservicii. o sa am o pagina web care primeste prompturi de la utilizator si genereaza cod pe care il trimite inapoi utilizatorului prin interfata web. la acest proiect o sa am mai multe microservicii de la autentificare la citire din fisiere istoric, implementarea unui gateway, implementarea unui service discovery. Ca tehnologii o sa folosesc langchain, modelul meu este codelama, limbajul python, fast api, jwt pentru partea de autentificare, si in microservicii vreau sa implementez o arhitectura pe straturi in ideea MVC. Vreau sa ma ajuti sa imi explici codul clar sa ma inveti nu doar sa muncesti pentru mine fara sa inteleg nimic, in cod daca pui comentarii nu vreau diacritice.

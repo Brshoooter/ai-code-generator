@@ -1,0 +1,58 @@
+# ═══════════════════════════════════════════════════════════════
+#  Docker Compose – mediu local de dezvoltare
+#  Pornire:  docker compose up --build
+#  Oprire:   docker compose down
+# ═══════════════════════════════════════════════════════════════
+
+services:
+
+  # ── Service Discovery ──────────────────────────────────────
+  # Trebuie sa porneasca primul, ca restul sa se poata inregistra
+  service-discovery:
+    build: ./Service_Discovery
+    ports:
+      - "8500:8500"
+    volumes:
+      - ./Service_Discovery:/app
+    environment:
+      - SD_PORT=8500
+
+  # ── API Gateway ────────────────────────────────────────────
+  # Poarta de intrare – frontend-ul trimite totul aici
+  api-gateway:
+    build: ./API_Gateway
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./API_Gateway:/app
+    environment:
+      - GW_SD_URL=http://service-discovery:8500
+    depends_on:
+      - service-discovery
+
+  # ── Chat Service ───────────────────────────────────────────
+  # Genereaza cod via Ollama (LLM local)
+  chat-service:
+    build: ./Chat_Service
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./Chat_Service:/app
+    environment:
+      - GEN_SD_URL=http://service-discovery:8500
+      - GEN_SERVICE_URL=http://chat-service:8000
+      - GEN_OLLAMA_BASE_URL=http://host.docker.internal:11434
+    depends_on:
+      - service-discovery
+
+  # ── Frontend ───────────────────────────────────────────────
+  # React + Vite dev server
+  frontend:
+    build: ./code-gen-frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./code-gen-frontend:/app
+      - /app/node_modules
+    depends_on:
+      - api-gateway
