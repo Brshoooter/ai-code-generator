@@ -1,0 +1,13 @@
+# Medii virtuale
+.venv/
+venv/
+env/
+
+# Fisiere compilate Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Variabile de mediu
+.env
+.env.*

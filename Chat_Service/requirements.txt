@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+langchain-ollama
+langchain-core
+pydantic
+pydantic-settings
+httpx
