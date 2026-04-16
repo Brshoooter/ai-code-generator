@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+httpx
+pydantic-settings
+pydantic[email]
+sqlalchemy
+psycopg2-binary
+pyjwt
+cryptography
+bcrypt

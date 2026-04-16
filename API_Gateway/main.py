@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from routes import router
 from middleware.logging_middleware import LoggingMiddleware
 from middleware.rate_limiter import RateLimiter
+from middleware.auth_middleware import JWTMiddleware
 from config import settings
 
 app = FastAPI(
@@ -23,6 +24,8 @@ app.add_middleware(
 
 logging_middleware = LoggingMiddleware()
 rate_limiter = RateLimiter()
+jwt_middleware = JWTMiddleware()
+
 
 @app.middleware("http")
 async def middleware_chain(request: Request, call_next):
@@ -32,7 +35,11 @@ async def middleware_chain(request: Request, call_next):
             content={"detail": "Prea multe request-uri. Incearca mai tarziu."}
         )
 
-    return await logging_middleware.logging_request(request, call_next)
+    async def dupa_jwt(req: Request):
+        return await logging_middleware.logging_request(req, call_next)
+
+    return await jwt_middleware.verify_jwt(request, dupa_jwt)
+
 
 app.include_router(router)
 

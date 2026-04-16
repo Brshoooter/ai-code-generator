@@ -45,6 +45,43 @@ services:
     depends_on:
       - service-discovery
 
+  # ── PostgreSQL ─────────────────────────────────────────────
+  # Baza de date pentru Auth Service
+  # Datele persista pe disk chiar daca containerul e oprit/sters
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"             # expus local pentru debug (ex: DBeaver, psql)
+    environment:
+      - POSTGRES_USER=auth_user
+      - POSTGRES_PASSWORD=auth_password
+      - POSTGRES_DB=auth_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auth_user -d auth_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Authentication Service ─────────────────────────────────
+  # JWT cu RS256, bcrypt, PostgreSQL
+  auth-service:
+    build: ./Authentification_Service
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./Authentification_Service:/app
+    environment:
+      - AUTH_SD_URL=http://service-discovery:8500
+      - AUTH_SERVICE_URL=http://auth-service:8001
+      - AUTH_DATABASE_URL=postgresql://auth_user:auth_password@postgres:5432/auth_db
+    depends_on:
+      service-discovery:
+        condition: service_started
+      postgres:
+        condition: service_healthy   # asteapta pana PostgreSQL e gata sa primeasca conexiuni
+
   # ── Frontend ───────────────────────────────────────────────
   # React + Vite dev server
   frontend:
@@ -56,3 +93,6 @@ services:
       - /app/node_modules
     depends_on:
       - api-gateway
+
+volumes:
+  postgres_data:    # volum named - Docker pastreaza datele intre restart-uri

@@ -16,5 +16,7 @@ class GatewaySettings(BaseSettings):
 
     cache_ttl: int = 30
 
+    jwt_public_key_path: str = "keys/public.pem"
+
 
 settings = GatewaySettings()

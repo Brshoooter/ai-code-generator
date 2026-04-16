@@ -1,12 +1,38 @@
+import { authService } from "./authService";
+
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
 const buildUrl = (serviceName, path) => {
   return `${API_URL}/api/${serviceName}/${path}`;
 };
 
+// Construieste header-ele pentru fiecare request, incluzand token-ul JWT daca exista
+const authHeaders = () => {
+  const token = authService.getToken();
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+};
+
+// Daca serverul raspunde cu 401, token-ul a expirat sau e invalid.
+// Facem logout automat si redirectionam la login.
+const handleUnauthorized = (response) => {
+  if (response.status === 401) {
+    authService.logout();
+    window.location.href = "/login";
+    return true;
+  }
+  return false;
+};
+
 export const apiClient = {
   async get(serviceName, path) {
-    const response = await fetch(buildUrl(serviceName, path));
+    const response = await fetch(buildUrl(serviceName, path), {
+      headers: authHeaders(),
+    });
+
+    if (handleUnauthorized(response)) return;
 
     if (!response.ok) {
       throw new Error(`GET ${path} failed: ${response.status}`);
@@ -18,9 +44,11 @@ export const apiClient = {
   async post(serviceName, path, body) {
     const response = await fetch(buildUrl(serviceName, path), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders(),
       body: JSON.stringify(body),
     });
+
+    if (handleUnauthorized(response)) return;
 
     if (!response.ok) {
       throw new Error(`POST ${path} failed: ${response.status}`);
@@ -32,9 +60,11 @@ export const apiClient = {
   async postStream(serviceName, path, body, onChunk) {
     const response = await fetch(buildUrl(serviceName, path), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders(),
       body: JSON.stringify(body),
     });
+
+    if (handleUnauthorized(response)) return;
 
     if (!response.ok) {
       throw new Error(`POST stream ${path} failed: ${response.status}`);

@@ -1,34 +1,51 @@
-const MOCK_TOKEN = "mock-jwt-token-codegen";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 const TOKEN_KEY = "auth_token";
 const USER_KEY = "auth_user";
 
 export const authService = {
-  async login(email, password) {
-    await new Promise((resolve) => setTimeout(resolve, 500));
+  async login(username, password) {
+    const response = await fetch(`${API_URL}/api/auth-service/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
 
-    if (!email || !password) {
-      throw new Error("Email and password are required");
+    if (!response.ok) {
+      const error = await response.json();
+      // 422 (validare Pydantic) returneaza detail ca array de obiecte, nu string
+      if (Array.isArray(error.detail)) {
+        throw new Error(error.detail.map((e) => e.msg).join("; "));
+      }
+      throw new Error(error.detail || "Autentificare esuata.");
     }
 
-    const user = { email, name: email.split("@")[0] };
-    localStorage.setItem(TOKEN_KEY, MOCK_TOKEN);
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    const data = await response.json();
+    localStorage.setItem(TOKEN_KEY, data.access_token);
+    localStorage.setItem(USER_KEY, JSON.stringify(data.user));
 
-    return { token: MOCK_TOKEN, user };
+    return { token: data.access_token, user: data.user };
   },
 
-  async register(email, password, name) {
-    await new Promise((resolve) => setTimeout(resolve, 500));
+  async register(username, email, password) {
+    const response = await fetch(`${API_URL}/api/auth-service/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, email, password }),
+    });
 
-    if (!email || !password || !name) {
-      throw new Error("All fields are required");
+    if (!response.ok) {
+      const error = await response.json();
+      if (Array.isArray(error.detail)) {
+        throw new Error(error.detail.map((e) => e.msg).join("; "));
+      }
+      throw new Error(error.detail || "Inregistrare esuata.");
     }
 
-    const user = { email, name };
-    localStorage.setItem(TOKEN_KEY, MOCK_TOKEN);
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    const data = await response.json();
+    localStorage.setItem(TOKEN_KEY, data.access_token);
+    localStorage.setItem(USER_KEY, JSON.stringify(data.user));
 
-    return { token: MOCK_TOKEN, user };
+    return { token: data.access_token, user: data.user };
   },
 
   logout() {

@@ -51,13 +51,13 @@ export function AuthProvider({ children }) {
     });
   }, []);
 
-  const login = async (email, password) => {
-    const { token, user } = await authService.login(email, password);
+  const login = async (username, password) => {
+    const { token, user } = await authService.login(username, password);
     dispatch({ type: "LOGIN", payload: { token, user } });
   };
 
-  const register = async (email, password, name) => {
-    const { token, user } = await authService.register(email, password, name);
+  const register = async (username, email, password) => {
+    const { token, user } = await authService.register(username, email, password);
     dispatch({ type: "LOGIN", payload: { token, user } });
   };
 

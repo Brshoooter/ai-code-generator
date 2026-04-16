@@ -4,9 +4,9 @@ import { useAuth } from "../context/AuthContext";
 
 export default function LoginPage() {
   const [isRegister, setIsRegister] = useState(false);
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -20,9 +20,9 @@ export default function LoginPage() {
 
     try {
       if (isRegister) {
-        await register(email, password, name);
+        await register(username, email, password);
       } else {
-        await login(email, password);
+        await login(username, password);
       }
       navigate("/");
     } catch (err) {
@@ -30,6 +30,14 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleToggleMode = () => {
+    setIsRegister(!isRegister);
+    setError("");
+    setUsername("");
+    setEmail("");
+    setPassword("");
   };
 
   return (
@@ -45,23 +53,23 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <input
+            type="text"
+            placeholder={isRegister ? "Username" : "Username sau Email"}
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            className="w-full px-4 py-3 rounded-lg bg-bg-secondary border border-border/30 text-dark placeholder-inactive text-sm outline-none focus:border-accent transition-colors"
+          />
+
           {isRegister && (
             <input
-              type="text"
-              placeholder="Name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-3 rounded-lg bg-bg-secondary border border-border/30 text-dark placeholder-inactive text-sm outline-none focus:border-accent transition-colors"
             />
           )}
-
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-4 py-3 rounded-lg bg-bg-secondary border border-border/30 text-dark placeholder-inactive text-sm outline-none focus:border-accent transition-colors"
-          />
 
           <input
             type="password"
@@ -87,10 +95,7 @@ export default function LoginPage() {
         <p className="text-center mt-6 text-sm text-accent">
           {isRegister ? "Already have an account?" : "Don't have an account?"}{" "}
           <button
-            onClick={() => {
-              setIsRegister(!isRegister);
-              setError("");
-            }}
+            onClick={handleToggleMode}
             className="text-dark font-medium hover:underline cursor-pointer"
           >
             {isRegister ? "Sign In" : "Create Account"}
