@@ -1,6 +1,6 @@
 import { apiClient } from "./apiClient";
 
-const SERVICE_NAME = "generate-service";
+const SERVICE_NAME = "chat-service";
 
 export const generateService = {
   async streamCode(prompt, onChunk) {

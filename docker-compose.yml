@@ -67,11 +67,11 @@ services:
   # ── Authentication Service ─────────────────────────────────
   # JWT cu RS256, bcrypt, PostgreSQL
   auth-service:
-    build: ./Authentification_Service
+    build: ./Authentication_Service
     ports:
       - "8001:8001"
     volumes:
-      - ./Authentification_Service:/app
+      - ./Authentication_Service:/app
     environment:
       - AUTH_SD_URL=http://service-discovery:8500
       - AUTH_SERVICE_URL=http://auth-service:8001

@@ -14,7 +14,7 @@ class GenerateSettings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
 
     sd_url: str = "http://localhost:8500"
-    service_name: str = "generate-service"
+    service_name: str = "chat-service"
     service_url: str = "http://localhost:8000"
 
 
