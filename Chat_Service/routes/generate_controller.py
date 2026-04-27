@@ -1,18 +1,16 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
-from services.generate_service import GenerateResponseService, CodeGenerationError
+from services.generate_service import GenerateResponseService
 from models import GenerateRequest
 
 router = APIRouter()
 
 service = GenerateResponseService()
 
+
 @router.post("/")
 async def generate_code(request: GenerateRequest):
-    try:
-        return StreamingResponse(
-            service.generate_code(request.prompt),
-            media_type="text/plain"
-        )
-    except CodeGenerationError as e:
-        raise HTTPException(status_code=400, detail=str(e))  
+    return StreamingResponse(
+        service.generate_code([m.model_dump() for m in request.messages]),
+        media_type="text/plain"
+    )

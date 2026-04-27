@@ -1,16 +1,15 @@
-import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { conversationService } from "../../services/conversationService";
 
-export default function Sidebar({ conversations, onNewConversation, onRefresh, isOpen, onToggle }) {
+export default function Sidebar({ conversations, loading, onRefresh, isOpen, onToggle }) {
   const { conversationId } = useParams();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
   const handleNew = () => {
-    const conversation = onNewConversation();
-    navigate(`/chat/${conversation.id}`);
+    navigate("/");
+    if (window.innerWidth < 768) onToggle();
   };
 
   const handleSelect = (id) => {
@@ -18,10 +17,10 @@ export default function Sidebar({ conversations, onNewConversation, onRefresh, i
     if (window.innerWidth < 768) onToggle();
   };
 
-  const handleDelete = (e, id) => {
+  const handleDelete = async (e, id) => {
     e.stopPropagation();
-    conversationService.delete(id);
-    onRefresh();
+    await conversationService.delete(id);
+    await onRefresh();
     if (conversationId === id) navigate("/");
   };
 
@@ -69,30 +68,33 @@ export default function Sidebar({ conversations, onNewConversation, onRefresh, i
         </div>
 
         <div className="flex-1 overflow-y-auto px-3 py-1">
-          {conversations.length === 0 && (
+          {loading ? (
+            <p className="text-inactive/60 text-xs text-center mt-8">Loading...</p>
+          ) : conversations.length === 0 ? (
             <p className="text-inactive/60 text-xs text-center mt-8">No conversations yet</p>
-          )}
-          {conversations.map((conv) => (
-            <div
-              key={conv.id}
-              onClick={() => handleSelect(conv.id)}
-              className={`group flex items-center gap-2 px-3 py-2.5 rounded-lg mb-0.5 cursor-pointer text-sm transition-colors ${
-                conversationId === conv.id
-                  ? "bg-bg-primary/15 text-bg-primary"
-                  : "text-inactive hover:bg-bg-primary/8 hover:text-bg-primary/90"
-              }`}
-            >
-              <span className="flex-1 truncate">{conv.title}</span>
-              <button
-                onClick={(e) => handleDelete(e, conv.id)}
-                className="opacity-0 group-hover:opacity-100 text-inactive hover:text-error transition-opacity cursor-pointer shrink-0"
+          ) : (
+            conversations.map((conv) => (
+              <div
+                key={conv.id}
+                onClick={() => handleSelect(conv.id)}
+                className={`group flex items-center gap-2 px-3 py-2.5 rounded-lg mb-0.5 cursor-pointer text-sm transition-colors ${
+                  conversationId === conv.id
+                    ? "bg-bg-primary/15 text-bg-primary"
+                    : "text-inactive hover:bg-bg-primary/8 hover:text-bg-primary/90"
+                }`}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M18 6L6 18M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          ))}
+                <span className="flex-1 truncate">{conv.title}</span>
+                <button
+                  onClick={(e) => handleDelete(e, conv.id)}
+                  className="opacity-0 group-hover:opacity-100 text-inactive hover:text-error transition-opacity cursor-pointer shrink-0"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ))
+          )}
         </div>
 
         <div className="p-3 border-t border-bg-primary/10">

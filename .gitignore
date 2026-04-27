@@ -9,3 +9,6 @@ Thumbs.db
 # Claude Code
 .claude/
 CLAUDE.md
+
+# Chei RSA — niciodata in repo
+*.pem

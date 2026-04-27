@@ -1,34 +1,36 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/layout/Sidebar";
 import ChatArea from "../components/chat/ChatArea";
 import { conversationService } from "../services/conversationService";
 
 export default function ChatPage() {
-  const [conversations, setConversations] = useState(() => conversationService.getAll());
+  const [conversations, setConversations] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
 
-  const refreshConversations = useCallback(() => {
-    setConversations(conversationService.getAll());
+  useEffect(() => {
+    conversationService.getAll()
+      .then(setConversations)
+      .finally(() => setLoading(false));
   }, []);
 
-  const handleNewConversation = () => {
-    const conversation = conversationService.create("New Conversation");
-    refreshConversations();
-    return conversation;
-  };
+  const refreshConversations = useCallback(async () => {
+    const data = await conversationService.getAll();
+    setConversations(data);
+  }, []);
 
-  const handleConversationUpdate = (newId) => {
-    refreshConversations();
+  const handleConversationUpdate = useCallback(async (newId) => {
     if (newId) navigate(`/chat/${newId}`);
-  };
+    await refreshConversations();
+  }, [refreshConversations, navigate]);
 
   return (
     <div className="h-screen flex bg-bg-primary overflow-hidden">
       <Sidebar
         conversations={conversations}
-        onNewConversation={handleNewConversation}
+        loading={loading}
         onRefresh={refreshConversations}
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}

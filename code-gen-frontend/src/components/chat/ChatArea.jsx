@@ -10,14 +10,16 @@ export default function ChatArea({ onConversationUpdate }) {
   const [messages, setMessages] = useState([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const bottomRef = useRef(null);
+  // id-ul unei conversatii create local: sarim peste fetch ca sa nu suprascriem state-ul curent
+  const skipNextFetchRef = useRef(null);
 
   useEffect(() => {
-    if (conversationId) {
-      const conversation = conversationService.getById(conversationId);
-      setMessages(conversation?.messages || []);
-    } else {
-      setMessages([]);
+    if (!conversationId) { setMessages([]); return; }
+    if (skipNextFetchRef.current === conversationId) {
+      skipNextFetchRef.current = null;
+      return;
     }
+    conversationService.getMessages(conversationId).then(setMessages);
   }, [conversationId]);
 
   useEffect(() => {
@@ -25,62 +27,65 @@ export default function ChatArea({ onConversationUpdate }) {
   }, [messages]);
 
   const handleSend = async (text, files) => {
-    if (!text && files.length === 0) return;
+    if (!text) return;
 
+    // PASUL 1: asigura conversatia — creata lazy la primul mesaj
     let activeId = conversationId;
-
     if (!activeId) {
-      const conversation = conversationService.create(text.slice(0, 50));
-      activeId = conversation.id;
+      const conv = await conversationService.create(text.slice(0, 50));
+      activeId = conv.id;
+      // marcam id-ul ca "detinut local" inainte de navigate, ca effect-ul sa nu refetcheze
+      skipNextFetchRef.current = activeId;
       onConversationUpdate(activeId);
     }
 
-    const fileData = files.map((f) => ({ name: f.name, size: f.size }));
+    // PASUL 2: salveaza mesajul user pe server (sursa de adevar)
+    let savedUserMsg;
+    try {
+      savedUserMsg = await conversationService.addMessage(activeId, "user", text);
+    } catch {
+      return;
+    }
 
-    conversationService.addMessage(activeId, "user", text, fileData);
-
-    const userMessage = {
-      id: crypto.randomUUID(),
-      role: "user",
-      content: text,
-      files: fileData,
-      timestamp: new Date().toISOString(),
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
-
-    const aiMessage = {
-      id: crypto.randomUUID(),
-      role: "assistant",
-      content: "",
-      files: [],
-      timestamp: new Date().toISOString(),
-    };
-
-    setMessages((prev) => [...prev, aiMessage]);
+    // PASUL 3: update UI optimist — mesajul user + placeholder pentru assistant
+    const updatedMessages = [
+      ...messages,
+      savedUserMsg,
+      { id: crypto.randomUUID(), role: "assistant", content: "", created_at: new Date().toISOString() },
+    ];
+    setMessages(updatedMessages);
     setIsStreaming(true);
 
+    // PASUL 4: stream de la Chat Service cu tot istoricul (fara placeholder-ul gol)
     let fullResponse = "";
+    const messagesForModel = updatedMessages.slice(0, -1);
 
     try {
-      await generateService.streamCode(text, (chunk) => {
+      await generateService.streamCode(messagesForModel, (chunk) => {
         fullResponse += chunk;
         setMessages((prev) => {
-          const updated = [...prev];
-          updated[updated.length - 1] = { ...updated[updated.length - 1], content: fullResponse };
-          return updated;
+          const copy = [...prev];
+          copy[copy.length - 1] = { ...copy[copy.length - 1], content: fullResponse };
+          return copy;
         });
       });
     } catch (err) {
-      fullResponse += `\n\n[Error: ${err.message}]`;
+      fullResponse += `\n\n[Eroare: ${err.message}]`;
       setMessages((prev) => {
-        const updated = [...prev];
-        updated[updated.length - 1] = { ...updated[updated.length - 1], content: fullResponse };
-        return updated;
+        const copy = [...prev];
+        copy[copy.length - 1] = { ...copy[copy.length - 1], content: fullResponse };
+        return copy;
       });
     } finally {
       setIsStreaming(false);
-      conversationService.addMessage(activeId, "assistant", fullResponse);
+      // PASUL 5: persista raspunsul (chiar si partial daca streaming a esuat)
+      if (fullResponse) {
+        try {
+          await conversationService.addMessage(activeId, "assistant", fullResponse);
+        } catch {
+          // raspunsul e afisat dar nesalvat in istoric
+        }
+      }
       onConversationUpdate(null);
     }
   };

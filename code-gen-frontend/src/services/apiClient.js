@@ -57,6 +57,19 @@ export const apiClient = {
     return response.json();
   },
 
+  async delete(serviceName, path) {
+    const response = await fetch(buildUrl(serviceName, path), {
+      method: "DELETE",
+      headers: authHeaders(),
+    });
+
+    if (handleUnauthorized(response)) return;
+
+    if (!response.ok) {
+      throw new Error(`DELETE ${path} failed: ${response.status}`);
+    }
+  },
+
   async postStream(serviceName, path, body, onChunk) {
     const response = await fetch(buildUrl(serviceName, path), {
       method: "POST",

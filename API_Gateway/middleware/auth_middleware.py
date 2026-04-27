@@ -53,6 +53,9 @@ class JWTMiddleware:
         try:
             payload = jwt.decode(token, PUBLIC_KEY, algorithms=["RS256"])
             request.state.user = payload
+            # Expunem user_id pentru rate limiter si pentru loggere downstream.
+            # Folosim "sub" daca exista (claim standard JWT), altfel "user_id" din payload.
+            request.state.user_id = str(payload.get("sub") or payload.get("user_id") or "")
         except jwt.ExpiredSignatureError:
             return JSONResponse(
                 status_code=401,

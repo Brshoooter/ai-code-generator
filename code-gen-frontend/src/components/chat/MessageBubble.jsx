@@ -31,7 +31,7 @@ export default function MessageBubble({ message }) {
         className={`max-w-[85%] md:max-w-[75%] ${
           isUser
             ? "bg-dark text-bg-primary rounded-2xl rounded-br-md px-4 py-3"
-            : "bg-bg-secondary text-dark rounded-2xl rounded-bl-md px-4 py-3"
+            : "w-full bg-bg-secondary text-dark rounded-2xl rounded-bl-md px-4 py-3"
         }`}
       >
         {message.files && message.files.length > 0 && (

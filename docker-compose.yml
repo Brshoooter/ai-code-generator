@@ -64,6 +64,25 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── PostgreSQL pentru History Service ─────────────────────
+  # Baza de date dedicata istoricului conversatiilor
+  # Port 5433 extern ca sa nu se loveasca cu postgres-ul de la auth (5432)
+  postgres-history:
+    image: postgres:16-alpine
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=history_user
+      - POSTGRES_PASSWORD=history_password
+      - POSTGRES_DB=history_db
+    volumes:
+      - postgres_history_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U history_user -d history_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   # ── Authentication Service ─────────────────────────────────
   # JWT cu RS256, bcrypt, PostgreSQL
   auth-service:
@@ -82,6 +101,25 @@ services:
       postgres:
         condition: service_healthy   # asteapta pana PostgreSQL e gata sa primeasca conexiuni
 
+  # ── History Service ───────────────────────────────────────
+  # Persista conversatiile per user in PostgreSQL dedicat
+  history-service:
+    build: ./History_Service
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./History_Service:/app
+    environment:
+      - HIST_SD_URL=http://service-discovery:8500
+      - HIST_SERVICE_URL=http://history-service:8002
+      - HIST_DATABASE_URL=postgresql://history_user:history_password@postgres-history:5432/history_db
+      - HIST_JWT_PUBLIC_KEY_PATH=keys/public.pem
+    depends_on:
+      service-discovery:
+        condition: service_started
+      postgres-history:
+        condition: service_healthy
+
   # ── Frontend ───────────────────────────────────────────────
   # React + Vite dev server
   frontend:
@@ -95,4 +133,5 @@ services:
       - api-gateway
 
 volumes:
-  postgres_data:    # volum named - Docker pastreaza datele intre restart-uri
+  postgres_data:          # volum named - Docker pastreaza datele intre restart-uri
+  postgres_history_data:  # volum dedicat istoricului conversatiilor

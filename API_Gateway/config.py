@@ -11,7 +11,10 @@ class GatewaySettings(BaseSettings):
 
     request_timeout: int = 60
 
-    rate_limit_requests: int = 20
+    # Limita pentru cereri autentificate, contorizate pe user_id.
+    rate_limit_user_requests: int = 60
+    # Limita pentru cereri anonime (login, register), contorizate pe IP. Anti-brute-force.
+    rate_limit_anon_requests: int = 10
     rate_limit_time_window: int = 60
 
     cache_ttl: int = 30

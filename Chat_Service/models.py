@@ -1,7 +1,11 @@
+from typing import Literal
 from pydantic import BaseModel, Field
 
+
+class Message(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1)
+
+
 class GenerateRequest(BaseModel):
-    prompt: str=Field(
-        min_length=1,
-        description="prompt- ul utilizatorului pentru generarea de cod"
-    )
+    messages: list[Message] = Field(min_length=1)
