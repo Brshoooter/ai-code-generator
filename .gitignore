@@ -12,3 +12,15 @@ CLAUDE.md
 
 # Chei RSA — niciodata in repo
 *.pem
+
+# Python bytecode si cache (generat la rulare, nu apartine repo-ului)
+__pycache__/
+*.pyc
+*.pyo
+
+# Fisiere de test temporare pentru upload manual
+test_upload.*
+
+# Variabile de mediu cu credentiale (AWS, etc.)
+.env
+*.env

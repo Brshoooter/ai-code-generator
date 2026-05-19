@@ -1,0 +1,32 @@
+# Framework web + server
+fastapi
+uvicorn
+
+# Comunicare HTTP intre servicii (Service Discovery, Ollama, etc.)
+httpx
+
+# Configurare prin variabile de mediu (BaseSettings cu prefix FILES_)
+pydantic-settings
+
+# ORM + driver PostgreSQL
+sqlalchemy
+psycopg2-binary
+
+# Tip de coloana Vector(N) si integrare cu SQLAlchemy pentru extensia pgvector
+pgvector
+
+# Verificare JWT RS256 (defense in depth, copy din History Service)
+pyjwt[crypto]
+
+# Suport pentru multipart/form-data (FastAPI UploadFile la POST de fisiere)
+python-multipart
+
+# Extragere text din PDF
+pypdf
+
+# Splitter recursiv pentru chunking text (pastreaza overlap intre bucati)
+langchain-text-splitters
+
+# Client AWS S3 (in Etapa 2 ramane neutilizat — folosim stub local pe disk;
+# se activeaza in Etapa 7 cand setam FILES_S3_BUCKET in .env)
+boto3

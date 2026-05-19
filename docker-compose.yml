@@ -64,6 +64,25 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── PostgreSQL pentru Files Service ───────────────────────
+  # Imaginea pgvector/pgvector:pg16 are extensia "vector" preinstalata
+  # Port 5434 extern ca sa nu se loveasca cu auth (5432) si history (5433)
+  postgres-files:
+    image: pgvector/pgvector:pg16
+    ports:
+      - "5434:5432"
+    environment:
+      - POSTGRES_USER=files_user
+      - POSTGRES_PASSWORD=files_pass
+      - POSTGRES_DB=files_db
+    volumes:
+      - postgres_files_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U files_user -d files_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   # ── PostgreSQL pentru History Service ─────────────────────
   # Baza de date dedicata istoricului conversatiilor
   # Port 5433 extern ca sa nu se loveasca cu postgres-ul de la auth (5432)
@@ -120,6 +139,33 @@ services:
       postgres-history:
         condition: service_healthy
 
+  # ── Files Service ─────────────────────────────────────────
+  # Microserviciu pentru fisiere atasate conversatiilor (RAG + S3)
+  # Vorbeste cu Ollama local pentru embeddings (nomic-embed-text)
+  files-service:
+    build: ./Files_Service
+    ports:
+      - "8003:8003"
+    volumes:
+      - ./Files_Service:/app
+    environment:
+      - FILES_SD_URL=http://service-discovery:8500
+      - FILES_SERVICE_URL=http://files-service:8003
+      - FILES_DATABASE_URL=postgresql+psycopg2://files_user:files_pass@postgres-files:5432/files_db
+      - FILES_OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - FILES_JWT_PUBLIC_KEY_PATH=keys/public.pem
+      - FILES_S3_BUCKET=${FILES_S3_BUCKET:-}
+      - FILES_AWS_REGION=${FILES_AWS_REGION:-eu-central-1}
+      - FILES_AWS_ACCESS_KEY_ID=${FILES_AWS_ACCESS_KEY_ID:-}
+      - FILES_AWS_SECRET_ACCESS_KEY=${FILES_AWS_SECRET_ACCESS_KEY:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      service-discovery:
+        condition: service_started
+      postgres-files:
+        condition: service_healthy
+
   # ── Frontend ───────────────────────────────────────────────
   # React + Vite dev server
   frontend:
@@ -135,3 +181,4 @@ services:
 volumes:
   postgres_data:          # volum named - Docker pastreaza datele intre restart-uri
   postgres_history_data:  # volum dedicat istoricului conversatiilor
+  postgres_files_data:    # volum dedicat fisierelor (pgvector)
