@@ -41,11 +41,49 @@ export const apiClient = {
     return response.json();
   },
 
+  async getBlob(serviceName, path) {
+    // GET care returneaza binar (nu JSON): folosit pentru download fisiere.
+    // Pastram header-ul Authorization (din authHeaders), dar citim raspunsul
+    // ca Blob — un obiect binar in memorie pe care browserul il poate deschide
+    // printr-un URL temporar (vezi fileService.download).
+    const response = await fetch(buildUrl(serviceName, path), {
+      headers: authHeaders(),
+    });
+
+    if (handleUnauthorized(response)) return;
+
+    if (!response.ok) {
+      throw new Error(`GET ${path} failed: ${response.status}`);
+    }
+
+    return response.blob();
+  },
+
   async post(serviceName, path, body) {
     const response = await fetch(buildUrl(serviceName, path), {
       method: "POST",
       headers: authHeaders(),
       body: JSON.stringify(body),
+    });
+
+    if (handleUnauthorized(response)) return;
+
+    if (!response.ok) {
+      throw new Error(`POST ${path} failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  async postFormData(serviceName, path, formData) {
+    // Upload multipart (fisiere). NU setam Content-Type manual: browser-ul il
+    // pune singur cu boundary-ul corect ("multipart/form-data; boundary=...").
+    // De aceea nu folosim authHeaders() aici (ala forteaza application/json).
+    const token = authService.getToken();
+    const response = await fetch(buildUrl(serviceName, path), {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
     });
 
     if (handleUnauthorized(response)) return;

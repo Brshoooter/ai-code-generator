@@ -24,3 +24,7 @@ test_upload.*
 # Variabile de mediu cu credentiale (AWS, etc.)
 .env
 *.env
+
+# Documentatia licentei (LaTeX) — nu o incarc pe GitHub
+Documentatie/
+Template_licenta_master_v0_99_2026/

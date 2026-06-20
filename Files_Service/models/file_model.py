@@ -65,14 +65,12 @@ class FileRecord(Base):
 # prin Ollama). Tipul Vector vine din pachetul "pgvector" si se mapeaza
 # la tipul SQL VECTOR(768) din extensia pgvector.
 #
-# Indexul ivfflat (vezi Index-ul de mai jos):
-#   - "ivf" = Inverted File Index, "flat" = stocheaza vectorii bruti, fara compresie
-#   - imparte vectorii in "lists" centroizi (100 e un default rezonabil pentru
-#     volume mici)
-#   - la cautare scaneaza doar centroizii apropiati de query, nu tot tabelul
-#   - operator class "vector_cosine_ops" inseamna distanta cosine (<=> in SQL)
-#   - alternativa ar fi HNSW (mai rapid la query, mai lent la insert) — ivfflat
-#     e suficient pentru zeci de mii de chunks
+# Cautarea vectoriala (vezi rag_service) e EXACTA: query-ul cu operatorul
+# <=> (distanta cosine) compara intrebarea cu toate chunk-urile care trec
+# de filtrul user_id + conversation_id. La volumul acestui proiect (cateva
+# fisiere per conversatie) costul e neglijabil, asa ca NU exista un index
+# vectorial. Daca volumul ar creste, pasul de optimizare ar fi un index
+# aproximativ (ivfflat sau HNSW) pe coloana embedding.
 class FileChunk(Base):
     __tablename__ = "file_chunks"
 
@@ -90,7 +88,8 @@ class FileChunk(Base):
 
     __table_args__ = (
         Index("ix_chunks_file", "file_id"),
-        # Indexul ivfflat se creeaza separat in lifespan dupa create_all,
-        # pentru ca SQLAlchemy nu stie nativ sa emita "USING ivfflat (...)
-        # WITH (lists = 100)". Vezi main.py — Etapa 2 pas 4.
+        # Nu exista index pe coloana "embedding": cautarea e exacta (scanare
+        # secventiala cu <=>), suficienta la volumul actual. Un eventual index
+        # aproximativ (ivfflat/HNSW) ar trebui creat separat in lifespan dupa
+        # create_all, fiindca SQLAlchemy nu stie nativ sa emita "USING ivfflat".
     )

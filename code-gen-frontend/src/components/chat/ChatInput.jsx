@@ -1,6 +1,12 @@
 import { useState, useRef } from "react";
 
-export default function ChatInput({ onSend, disabled }) {
+export default function ChatInput({
+  onSend,
+  disabled,
+  attachedFiles = [],
+  onDownloadFile,
+  onDeleteFile,
+}) {
   const [message, setMessage] = useState("");
   const [files, setFiles] = useState([]);
   const fileInputRef = useRef(null);
@@ -44,6 +50,42 @@ export default function ChatInput({ onSend, disabled }) {
 
   return (
     <div className="border-t border-border/20 bg-bg-primary px-4 py-3">
+      {/* Fisierele DEJA urcate in conversatie. Click pe corp = download/preview
+          in tab nou, X = stergere de pe server. Distincte vizual (au icon de
+          download) de fisierele selectate acum, care inca nu au fost trimise. */}
+      {attachedFiles.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-2">
+          {attachedFiles.map((file) => (
+            <span
+              key={file.file_id}
+              className="inline-flex items-center gap-1.5 text-xs bg-bg-secondary text-dark px-2.5 py-1.5 rounded-lg border border-border/30"
+            >
+              <button
+                onClick={() => onDownloadFile?.(file.file_id)}
+                title="Deschide / descarca"
+                className="inline-flex items-center gap-1.5 hover:text-accent cursor-pointer"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                {file.original_name}
+              </button>
+              <button
+                onClick={() => onDeleteFile?.(file.file_id)}
+                title="Sterge fisierul"
+                className="hover:text-error cursor-pointer"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
       {files.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-2">
           {files.map((file, i) => (
@@ -83,6 +125,7 @@ export default function ChatInput({ onSend, disabled }) {
           ref={fileInputRef}
           type="file"
           multiple
+          accept=".pdf,.txt,.md,.py,.js,.ts,.c,.cpp,.java,.go,.rs"
           onChange={handleFileSelect}
           className="hidden"
         />

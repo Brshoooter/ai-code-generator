@@ -4,11 +4,14 @@ import MessageBubble from "./MessageBubble";
 import ChatInput from "./ChatInput";
 import { generateService } from "../../services/generateService";
 import { conversationService } from "../../services/conversationService";
+import { fileService } from "../../services/fileService";
 
 export default function ChatArea({ onConversationUpdate }) {
   const { conversationId } = useParams();
   const [messages, setMessages] = useState([]);
   const [isStreaming, setIsStreaming] = useState(false);
+  // fisierele deja urcate in conversatia curenta (sursa: files-service)
+  const [attachedFiles, setAttachedFiles] = useState([]);
   const bottomRef = useRef(null);
   // id-ul unei conversatii create local: sarim peste fetch ca sa nu suprascriem state-ul curent
   const skipNextFetchRef = useRef(null);
@@ -22,22 +25,76 @@ export default function ChatArea({ onConversationUpdate }) {
     conversationService.getMessages(conversationId).then(setMessages);
   }, [conversationId]);
 
+  // Incarca lista de fisiere ori de cate ori se schimba conversatia. La o
+  // conversatie noua (inca fara id in URL) lista e goala.
+  useEffect(() => {
+    loadFiles(conversationId);
+  }, [conversationId]);
+
+  // Reincarca lista de fisiere a unei conversatii. Best-effort: daca pica
+  // (ex. conversatie inca necreata pe server), doar logam si lasam lista cum e.
+  const loadFiles = async (convId) => {
+    if (!convId) { setAttachedFiles([]); return; }
+    try {
+      const list = await fileService.list(convId);
+      setAttachedFiles(list);
+    } catch (err) {
+      console.error("Nu am putut incarca lista de fisiere:", err);
+    }
+  };
+
+  // Sterge un fisier urcat si actualizeaza lista optimist (scoatem chip-ul
+  // imediat din UI, fara sa mai asteptam un refetch).
+  const handleDeleteFile = async (fileId) => {
+    try {
+      await fileService.remove(fileId);
+      setAttachedFiles((prev) => prev.filter((f) => f.file_id !== fileId));
+    } catch (err) {
+      console.error("Stergere fisier esuata:", err);
+    }
+  };
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const handleSend = async (text, files) => {
-    if (!text) return;
+    const hasFiles = files && files.length > 0;
+    // nimic de trimis (nici text, nici fisiere) → iesim
+    if (!text && !hasFiles) return;
 
-    // PASUL 1: asigura conversatia — creata lazy la primul mesaj
+    // PASUL 1: asigura conversatia — creata lazy la primul mesaj sau fisier.
+    // Fisierele se ataseaza unei conversatii, deci trebuie sa existe una
+    // inainte de upload.
     let activeId = conversationId;
     if (!activeId) {
-      const conv = await conversationService.create(text.slice(0, 50));
+      const conv = await conversationService.create(
+        text ? text.slice(0, 50) : "New Conversation"
+      );
       activeId = conv.id;
       // marcam id-ul ca "detinut local" inainte de navigate, ca effect-ul sa nu refetcheze
       skipNextFetchRef.current = activeId;
       onConversationUpdate(activeId);
     }
+
+    // PASUL 1.5: upload fisierele atasate INAINTE de generare, ca embeddings sa
+    // fie gata cand Chat Service cere context (RAG). Secvential — un fisier
+    // esuat (ex. tip neacceptat, prea mare) e logat dar nu opreste restul.
+    if (hasFiles) {
+      for (const file of files) {
+        try {
+          await fileService.upload(activeId, file);
+        } catch (err) {
+          console.error(`Upload esuat pentru ${file.name}:`, err);
+        }
+      }
+      // dupa upload, reincarcam lista ca sa apara chip-urile noi in UI
+      await loadFiles(activeId);
+    }
+
+    // daca s-au atasat doar fisiere (fara intrebare), ne oprim aici: fisierele
+    // sunt urcate si vor fi folosite la urmatoarea intrebare din conversatie.
+    if (!text) return;
 
     // PASUL 2: salveaza mesajul user pe server (sursa de adevar)
     let savedUserMsg;
@@ -61,7 +118,7 @@ export default function ChatArea({ onConversationUpdate }) {
     const messagesForModel = updatedMessages.slice(0, -1);
 
     try {
-      await generateService.streamCode(messagesForModel, (chunk) => {
+      await generateService.streamCode(messagesForModel, activeId, (chunk) => {
         fullResponse += chunk;
         setMessages((prev) => {
           const copy = [...prev];
@@ -126,7 +183,13 @@ export default function ChatArea({ onConversationUpdate }) {
         )}
       </div>
 
-      <ChatInput onSend={handleSend} disabled={isStreaming} />
+      <ChatInput
+        onSend={handleSend}
+        disabled={isStreaming}
+        attachedFiles={attachedFiles}
+        onDownloadFile={fileService.download}
+        onDeleteFile={handleDeleteFile}
+      />
     </div>
   );
 }

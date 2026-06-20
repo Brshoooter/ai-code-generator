@@ -11,10 +11,12 @@ fisierul brut in S3 (stub). Coloana de chunks ramane goala —
 embedding-ul vine in Etapa 3, prin rag_service.
 
 Endpointuri:
-  POST   /conversations/{conv_id}/files   → upload (returneaza FileResponse)
-  GET    /conversations/{conv_id}/files   → lista fisiere user pe conversatie
-  DELETE /files/{file_id}                 → sterge fisier (404 daca nu e al userului)
-  GET    /files/{file_id}/download        → descarca / previzualizeaza binarul
+  POST   /conversations/{conv_id}/files     → upload (returneaza FileResponse)
+  GET    /conversations/{conv_id}/files     → lista fisiere user pe conversatie
+  DELETE /files/{file_id}                   → sterge fisier (404 daca nu e al userului)
+  GET    /files/{file_id}/download          → descarca / previzualizeaza binarul
+  POST   /conversations/{conv_id}/retrieve  → cautare vectoriala (RAG) pe chunks
+  DELETE /internal/conversations/{conv_id}  → cleanup cascade (apelat de History)
 """
 
 import logging
@@ -26,6 +28,7 @@ from fastapi import (
     APIRouter,
     Depends,
     File,
+    Header,
     HTTPException,
     Response,
     UploadFile,
@@ -36,7 +39,14 @@ from sqlalchemy.orm import Session
 from config import settings
 from database.database import get_db
 from models.file_model import FileRecord
-from models.schemas import FileListItem, FileResponse
+from models.schemas import (
+    FileListItem,
+    FileResponse,
+    InternalDeleteRequest,
+    InternalDeleteResponse,
+    RetrieveRequest,
+    RetrieveResponse,
+)
 from services import quota_service, rag_service
 from services.jwt_handler import get_current_user_id
 from services.s3_client import S3Client
@@ -350,3 +360,100 @@ def download_file(
             "Content-Length": str(len(body)),
         },
     )
+
+
+# ─────────────────────────────────────────────────────────────────
+# POST /conversations/{conv_id}/retrieve — cautare vectoriala (RAG)
+# ─────────────────────────────────────────────────────────────────
+@router.post(
+    "/conversations/{conv_id}/retrieve",
+    response_model=RetrieveResponse,
+)
+async def retrieve(
+    conv_id: UUID,
+    body: RetrieveRequest,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    """
+    Cauta cele mai relevante chunks pentru un query, in fisierele userului
+    din conversatia data. Apelat de Chat Service (Etapa 4) cu JWT-ul
+    utilizatorului forwardat, dar testabil si manual cu curl.
+
+    Async pentru ca rag_service.retrieve_chunks face un apel de retea catre
+    Ollama (embed query) cu await — daca ar fi sincron, ar bloca event
+    loop-ul FastAPI pe durata embedding-ului.
+
+    Auth + izolare: JWT obligatoriu, iar SQL-ul din rag_service filtreaza
+    WHERE user_id = :sub AND conversation_id = :cid. Nu verificam aici daca
+    "conversatia exista" — daca nu sunt fisiere (sau conv_id e strain),
+    primim pur si simplu o lista goala, fara sa leak-uim informatie.
+
+    top_k vine din body (default 4, validat 1..20 de Pydantic).
+    """
+    chunks = await rag_service.retrieve_chunks(
+        db=db,
+        user_id=user_id,
+        conversation_id=conv_id,
+        query=body.query,
+        top_k=body.top_k,
+    )
+    return RetrieveResponse(chunks=chunks)
+
+
+# ─────────────────────────────────────────────────────────────────
+# DELETE /internal/conversations/{conv_id} — cleanup cascade (intern)
+# ─────────────────────────────────────────────────────────────────
+@router.delete(
+    "/internal/conversations/{conv_id}",
+    response_model=InternalDeleteResponse,
+)
+def internal_delete_conversation(
+    conv_id: UUID,
+    body: InternalDeleteRequest,
+    x_internal_service: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+):
+    """
+    Sterge toate fisierele unei conversatii. Apelat de History Service cand
+    utilizatorul sterge o conversatie (cascade History → Files).
+
+    Autorizare: NU prin JWT, ci prin header-ul X-Internal-Service. E o ruta
+    interna intre servicii in reteaua Docker; History trimite explicit
+    user_id in body (nu vine cu token-ul utilizatorului). FastAPI mapeaza
+    parametrul x_internal_service la header-ul HTTP "X-Internal-Service".
+    Lipsa lui sau valoare diferita de "history-service" → 403.
+
+    Idempotent: daca nu exista fisiere pentru (user_id, conv_id), raspunde 0
+    fara eroare. Asa History poate apela mereu cleanup-ul, chiar daca
+    conversatia n-avea fisiere.
+    """
+    if x_internal_service != "history-service":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Ruta interna: header X-Internal-Service invalid sau lipsa",
+        )
+
+    # Stergem binarele din S3 prin prefix (user_id/conv_id/) — acopera toate
+    # fisierele conversatiei intr-un singur apel. delete_prefix returneaza
+    # cate obiecte a sters si e idempotent (0 daca prefixul nu exista).
+    s3_client.delete_prefix(f"{body.user_id}/{conv_id}/")
+
+    # Bulk delete pe DB: cascade-ul ON DELETE pe file_chunks (la nivel de DB)
+    # sterge automat si chunk-urile. synchronize_session=False — nu avem
+    # nevoie sa sincronizam obiecte deja incarcate in sesiune.
+    deleted = (
+        db.query(FileRecord)
+        .filter(
+            FileRecord.user_id == body.user_id,
+            FileRecord.conversation_id == conv_id,
+        )
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+
+    logger.info(
+        f"Cleanup intern: sters {deleted} fisiere pentru conv {conv_id} "
+        f"(user {body.user_id})"
+    )
+    return InternalDeleteResponse(deleted_files=deleted)

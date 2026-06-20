@@ -153,6 +153,7 @@ services:
       - FILES_SERVICE_URL=http://files-service:8003
       - FILES_DATABASE_URL=postgresql+psycopg2://files_user:files_pass@postgres-files:5432/files_db
       - FILES_OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - FILES_EMBEDDING_MODEL=nomic-embed-text
       - FILES_JWT_PUBLIC_KEY_PATH=keys/public.pem
       - FILES_S3_BUCKET=${FILES_S3_BUCKET:-}
       - FILES_AWS_REGION=${FILES_AWS_REGION:-eu-central-1}

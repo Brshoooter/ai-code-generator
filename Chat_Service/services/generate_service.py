@@ -37,12 +37,50 @@ class GenerateResponseService:
         )
         logger.info(f"GenerateResponseService initiat cu modelul {settings.ollama_model}")
 
-    def generate_code(self, messages: list[dict]) -> Generator[str, None, None]:
+    @staticmethod
+    def _build_context_message(chunks: list[dict]) -> str:
+        """
+        Transforma fragmentele primite de la Files Service intr-un singur text
+        de context, cu antet per fragment ca modelul sa stie din ce fisier vine.
+
+        Format:
+            [Sursa: main.py, fragment 3]
+            <continut chunk>
+            ---
+            [Sursa: README.md, fragment 0]
+            <continut chunk>
+        """
+        parts = []
+        for c in chunks:
+            antet = f"[Sursa: {c.get('file_name', '?')}, fragment {c.get('chunk_index', '?')}]"
+            parts.append(f"{antet}\n{c.get('content', '')}")
+        corp = "\n---\n".join(parts)
+        return (
+            "Foloseste urmatorul context din fisierele utilizatorului pentru a "
+            "raspunde. Daca raspunsul nu se afla in context, foloseste-ti "
+            "cunostintele generale.\n\n" + corp
+        )
+
+    def generate_code(
+        self,
+        messages: list[dict],
+        context_chunks: list[dict] | None = None,
+    ) -> Generator[str, None, None]:
         if not messages or messages[-1]["role"] != "user":
             raise CodeGenerationError("Ultimul mesaj trebuie sa fie de la user")
 
         # system prompt-ul e adaugat pe server — frontend-ul nu il poate modifica
         lc_messages = [SystemMessage(content=SYSTEM_PROMPT)]
+        # Al doilea SystemMessage cu contextul RAG, DOAR daca avem fragmente.
+        # Tot pe server: frontend-ul trimite query-ul, dar nu controleaza
+        # niciodata continutul contextului injectat.
+        if context_chunks:
+            lc_messages.append(
+                SystemMessage(content=self._build_context_message(context_chunks))
+            )
+            logger.info(f"RAG: injectez {len(context_chunks)} fragmente in prompt")
+        else:
+            logger.info("RAG: fara context (niciun fragment)")
         for m in messages:
             if m["role"] == "user":
                 lc_messages.append(HumanMessage(content=m["content"]))

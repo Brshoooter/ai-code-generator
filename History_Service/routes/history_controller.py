@@ -9,6 +9,7 @@ from models.schemas import (
     MessageCreate,
     MessageResponse,
 )
+from services import files_client
 from services.history_service import (
     add_message,
     create_conversation,
@@ -68,10 +69,15 @@ def add_message_endpoint(
 
 
 @router.delete("/conversations/{conv_id}", status_code=204)
-def delete_conversation_endpoint(
+async def delete_conversation_endpoint(
     conv_id: str,
     user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
+    # Intai stergerea in DB-ul propriu. Daca conversatia nu exista sau nu e a
+    # userului, delete_conversation arunca 404 si nu mai ajungem la cleanup.
     delete_conversation(conv_id, user_id, db)
+    # Apoi cleanup-ul cascade al fisierelor din Files Service. Best-effort:
+    # daca Files e jos, stergerea conversatiei tot a reusit (vezi files_client).
+    await files_client.delete_conversation_files(user_id, conv_id)
     return Response(status_code=204)
